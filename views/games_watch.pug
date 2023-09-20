@@ -1,0 +1,17 @@
+//- vim:ts=4:sw=4:
+doctype html
+html
+	head
+		include head
+		title= SITE_NAME
+		if user
+			meta(http-equiv="refresh" content=900)
+	body
+		include header
+		article.wide
+			h1 &#x1f4fa; Live Games
+
+			if games.length > 0
+				+gamelist(games)
+			else
+				p Everybody is asleep.

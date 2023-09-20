@@ -1540,6 +1540,14 @@ const SQL_SELECT_GAME = SQL("SELECT * FROM games WHERE game_id=?")
 const SQL_SELECT_GAME_VIEW = SQL("SELECT * FROM game_view WHERE game_id=?")
 const SQL_SELECT_GAME_TITLE = SQL("SELECT title_id FROM games WHERE game_id=?").pluck()
 
+const SQL_SELECT_GAME_VIEW_LIVE = SQL(`
+	select * from game_view where game_id=?
+		and status=1
+		and is_opposed
+		and player_count=?
+		and julianday('now') < julianday(mtime, '+15 minutes')
+`)
+
 const SQL_SELECT_PLAYERS = SQL("select * from players join user_view using(user_id) where game_id=?")
 const SQL_SELECT_PLAYERS_WITH_NAME = SQL("select role, user_id, name from players join users using(user_id) where game_id=?")
 const SQL_UPDATE_PLAYER_ACCEPT = SQL("UPDATE players SET is_invite=0 WHERE game_id=? AND role=? AND user_id=?")
@@ -1823,6 +1831,37 @@ app.get("/tm/finished/:who_name", function (req, res) {
 	} else {
 		return res.status(404).send("Invalid user name.")
 	}
+})
+
+app.get("/games/watch", function (req, res) {
+	let games = []
+
+	for (let game_id in game_clients) {
+		let list = game_clients[game_id]
+		if (list.length > 0) {
+			let observers = 0
+			for (let i = 0; i < list.length; ++i) {
+				if (list[i].role === "Observer")
+					++observers
+				else
+					for (let k = i + 1; k < list.length; ++k)
+						if (list[i].role === list[k].role)
+							++observers
+			}
+			let n = list.length - observers
+			if (n >= 2) {
+				let game = SQL_SELECT_GAME_VIEW_LIVE.get(game_id|0, n)
+				if (game)
+					games.push(game)
+			}
+		}
+	}
+
+	games.sort((a,b) => (a.mtime > b.mtime ? -1 : 1))
+
+	annotate_games(games, 0, null)
+
+	res.render("games_watch.pug", { user: req.user, games })
 })
 
 app.get("/games/public", function (req, res) {
